@@ -1,2 +1,4 @@
 - AtTiny điều khiển FET trong mạch buck, đo áp phản hồi đầu ra ?
+http://www.youspice.com/spiceprojects/spice-simulation-projects/power-and-battery-circuits-spice-simulation-projects/switching-power-supplies-spice-simulation-projects/buck-converter-with-pic16c72a/
+
 - UC3845 điều khiển pwm->Fet, phản hồi điện áp ? 

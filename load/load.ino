@@ -64,6 +64,7 @@ int cur_value_dac = 0;
 
 unsigned long t_update_display, t_update_i_set, t_buzz, t_downI, t_upI;
 float value_i_load, value_u_s, value_i_s;
+float led_value_u_s, led_value_i_s, led_value_i_load;
 float delta_i_set = 0;
 int raw_i_load, raw_u_s, raw_i_s;
 int index_i_set = 0;
@@ -173,19 +174,26 @@ void loop() {
     stt_down = 0;
   }
 
-  sensing();
+  sensing(); // get value
   if (stt_run) { // control I
     set_i(index_i_set);
   }
 
-  show(); // update led 7-seg every loop
+  if (stt_set_i == false) {
+    // update live value
+    led_value_i_load = value_i_load;
+    led_value_u_s = value_u_s;
+    led_value_i_s = value_i_s;
+  }
+  else {
+    // cyclic update
+    if (millis() - t_update_display > 500) {
+      t_update_display = millis();
+      led_value_i_load = value_i_load;
+      led_value_u_s = value_u_s;
+      led_value_i_s = value_i_s;
 
-  // test raw ADC
-
-  if (millis() - t_update_display > 250) {
-    t_update_display = millis();
-    if (stt_set_i == true) {
-
+      // test raw ADC
       /*
       Serial.print(analogRead(pin_u_s));
       Serial.print(", ");
@@ -205,30 +213,31 @@ void loop() {
       Serial.println(raw_i_s);
       */
       // test snap ADC
-      
+      /*
       //Serial.println();
       Serial.print(value_u_s,3);
       Serial.print("\t");
       Serial.print(value_i_load,3);
       Serial.print("\t");
       Serial.println(value_i_s,3);
-      
+      */
     }
   }
 
+  show(); // update led 7-seg every loop
 }
 //end loop================================================================================
 void show() {
   //show i_load i_s=========================================
   int l0, l1, l2, l3, r0, r1, r2, r3, x;
-  x = value_i_load * 1000;
+  x = led_value_i_load * 1000;
   //x = value_i_load;
   l0 = x / 1000;
   l1 = x % 1000 / 100;
   l2 = x % 1000 % 100 / 10;
   l3 = x % 1000 % 100 % 10;
 
-  x = value_i_s * 1000;
+  x = led_value_i_s * 1000;
   //x = value_i_s;
   r0 = x / 1000;
   r1 = x % 1000 / 100;
@@ -267,7 +276,7 @@ void show() {
   l2 = x % 1000 % 100 / 10;
   l3 = x % 1000 % 100 % 10;
 
-  x = value_u_s * 100;
+  x = led_value_u_s * 100;
   //x = value_u_s;
   r0 = x / 1000;
   r1 = x % 1000 / 100;
@@ -550,7 +559,7 @@ void initADC() {
 
   // snap_i_s
   snap_i_s.setActivityThreshold(1.0);
-  snap_i_s.setSnapMultiplier(0.05);
+  snap_i_s.setSnapMultiplier(0.025);
 
   // snap_u_s
   snap_u_s.setActivityThreshold(1.0);
@@ -615,7 +624,6 @@ void set_i(int index_i_set) {
   delta_i_set = abs(i_set_point[index_i_set] - value_i_load);
 
   if (delta_i_set > 0.01) {
-    Serial.println(delta_i_set,5);
     if (value_i_load < i_set_point[index_i_set]) {// increase I
       if (millis() - t_upI > 50) {
         if (++pwm_i_set > max_pwm_i_set) pwm_i_set = 1023;
@@ -623,7 +631,8 @@ void set_i(int index_i_set) {
         fastPWMdac.analogWrite10bit(pwm_i_set);
         t_upI = millis();
         if (debug) {
-          Serial.println("+");
+          Serial.print(delta_i_set, 5);
+          Serial.println("\t+");
         }
       }
     }
@@ -633,7 +642,8 @@ void set_i(int index_i_set) {
         if (--pwm_i_set < min_pwm_i_set) pwm_i_set = 0;
         fastPWMdac.analogWrite10bit(pwm_i_set);
         if (debug) {
-          Serial.println("-");
+          Serial.print(delta_i_set, 5);
+          Serial.println("\t-");
         }
       }
     }
@@ -653,15 +663,15 @@ void sensing() {
   raw_i_load = snap_i_load.getValue();
 
   //voltage: raw/1023.0*Vref*19
-  if(raw_u_s) value_u_s = raw_u_s / 10.5;
+  if (raw_u_s) value_u_s = raw_u_s / 10.5;
   else value_u_s = 0;
 
   // i_s
-  if (raw_i_s) value_i_s = raw_i_s*0.0053 - 0.0052;
+  if (raw_i_s) value_i_s = raw_i_s * 0.0053 - 0.0052;
   else value_i_s = 0;
 
   // i_load
-  if (raw_i_load) value_i_load = raw_i_load*0.0053 + 0.01;
+  if (raw_i_load) value_i_load = raw_i_load * 0.0053 + 0.01;
   else value_i_load = 0;
 }
 

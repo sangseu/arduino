@@ -24,7 +24,7 @@ float analog_reading; //the ADC reading
 uint8_t adc_12bits = 12; //bits of precision for the ADC (Analog to Digital Converter)
 uint8_t adc_11bits = 11;
 unsigned int num_samples = 1;
-const float Vref = 1.096;
+const float Vref = 1.096; // internal Voltage refrence
 //const float Vref = 5;
 
 //adc eliminating noise
@@ -60,11 +60,11 @@ float u, u_temp, i, i_temp;
 int u_count = 0;
 int i_count = 0;
 
-bool have_change = 0;
+bool have_change = 0; // have_change be set when rotate encoder
 
 unsigned long late, t_update_display;
 void hienthi(float giatri, int m)
-{ // hien thi  7 seg 1
+{ // hien thi  7-seg 1
   int a1, a2, a3, a4, x;
   switch (m) {
     case 1:
@@ -76,33 +76,25 @@ void hienthi(float giatri, int m)
         a4 = x % 1000 % 100 % 10;
 
         digitalWrite(latchPin, LOW);
-        //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-        //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
         shiftOut(dataPin, clockPin, MSBFIRST, C[0]);
         shiftOut(dataPin, clockPin, MSBFIRST, B[a1]);
         digitalWrite(latchPin, HIGH);
         digitalWrite(latchPin, LOW);
-        //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-        //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
         shiftOut(dataPin, clockPin, MSBFIRST, C[1]);
         shiftOut(dataPin, clockPin, MSBFIRST, A[a2]);
         digitalWrite(latchPin, HIGH);
         digitalWrite(latchPin, LOW);
-        //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-        //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
         shiftOut(dataPin, clockPin, MSBFIRST, C[2]);
         shiftOut(dataPin, clockPin, MSBFIRST, A[a3]);
         digitalWrite(latchPin, HIGH);
         digitalWrite(latchPin, LOW);
-        //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-        //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
         shiftOut(dataPin, clockPin, MSBFIRST, C[3]);
         shiftOut(dataPin, clockPin, MSBFIRST, A[a4]);
         digitalWrite(latchPin, HIGH);
 
         break;
       }
-    // hien thi  7 seg 2
+    // hien thi  7-seg 2
     case 2:
       {
         if (giatri >= 10) {// 10.00-99.99
@@ -113,26 +105,18 @@ void hienthi(float giatri, int m)
           a4 = x % 10;
 
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[4]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a1]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[5]);
           shiftOut(dataPin, clockPin, MSBFIRST, B[a2]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[6]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a3]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[7]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a4]);
           digitalWrite(latchPin, HIGH);
@@ -144,26 +128,18 @@ void hienthi(float giatri, int m)
           a3 = x % 1000 % 100 / 10;
           a4 = x % 1000 % 100 % 10;
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[4]);
           shiftOut(dataPin, clockPin, MSBFIRST, B[a1]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[5]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a2]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[6]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a3]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[7]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a4]);
           digitalWrite(latchPin, HIGH);
@@ -203,10 +179,10 @@ void setup() {
 
   //adc======================
   analogReference(INTERNAL);
-  //adc value (0,550]
+  // adc value (0,550]
   analog.setActivityThreshold(2.0);
   analog.setSnapMultiplier(0.025);
-  //adc value (550;1023)
+  // adc value (550;1023]
   //analog.setActivityThreshold(3.0);
   //analog.setSnapMultiplier(0.05);
   //=========================

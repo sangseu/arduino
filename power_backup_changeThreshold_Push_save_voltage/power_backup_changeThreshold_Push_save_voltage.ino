@@ -1,8 +1,10 @@
+#include "eRCaGuy_analogReadXXbit.h"
+
 #include <SPI.h>
 #include <EEPROM.h>
 // adc eliminating noise
 // include the ResponsiveAnalogRead library
-#include <ResponsiveAnalogRead.h>
+#include "ResponsiveAnalogRead.h"
 
 #define a_1 50
 #define max_encoder 4095
@@ -27,18 +29,21 @@ unsigned int num_samples = 1;
 const float Vref = 1.096;
 //const float Vref = 5;
 
+int u_xx = 0;
+
 // make a ResponsiveAnalogRead object, pass in the pin, and either true or false depending on if you want sleep enabled
 // enabling sleep will cause values to take less time to stop changing and potentially stop changing more abruptly,
 //   where as disabling sleep will cause values to ease into their correct position smoothly and more accurately
-ResponsiveAnalogRead analog_u(sen_u, true);
+ResponsiveAnalogRead analog_u(u_xx, true);
 ResponsiveAnalogRead analog_i(sen_i, true);
 
 // the next optional argument is snapMultiplier, which is set to 0.01 by default
 // you can pass it a value from 0 to 1 that controls the amount of easing
 // increase this to lessen the amount of easing (such as 0.1) and make the responsive values more responsive
 // but doing so may cause more noise to seep through if sleep is not enabled
-
 //=====================
+
+eRCaGuy_analogReadXXbit adc;
 
 //push=================
 int cur, prev, stt_push;
@@ -57,18 +62,19 @@ int C[8] = {223, 191, 127, 239, 253, 251, 247, 254};// select LED
 int D[2] = {0, 255};
 int m = 0;
 int l = 0;
-float u, u_raw, i, i_raw;
+int u_raw, i_raw;
+unsigned long u, i;
 int u_count = 0;
 int i_count = 0;
 
 bool have_change = 0;
 
 unsigned long late, t_update_display;
-void hienthi(float giatri, int m)
-{ // hien thi  7 seg 1
-  int a1, a2, a3, a4, x;
+void hienthi(unsigned long giatri, int m)
+{ // hien thi  7-seg
+  unsigned long a1, a2, a3, a4, x;
   switch (m) {
-    case 1:
+    case 1:// show I
       {
         x = giatri * 1000;
         a1 = x / 1000;
@@ -103,68 +109,58 @@ void hienthi(float giatri, int m)
 
         break;
       }
-    // hien thi  7 seg 2
-    case 2:
+    // hien thi  7-seg----2
+    case 2:// show U
       {
-        if (giatri >= 10) {// 10.00-99.99
-          a1 = (int)giatri / 10;
-          a2 = (int)giatri % 10;
-          x = (int)(giatri * 100) % 1000 % 100;
-          a3 = x / 10;
-          a4 = x % 10;
+        // 24.56 -> 24560
+        // 10.234 -> 10234
+        // 1.234 -> 1234
+
+        if (giatri >= 10000) {// 10.00-99.99
+          a1 = giatri / 10000;
+          a2 = giatri % 10000 / 1000;
+          a3 = giatri % 10000 % 1000 / 100;
+          a4 = giatri % 10000 % 1000 % 100 / 10;
 
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[4]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a1]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[5]);
           shiftOut(dataPin, clockPin, MSBFIRST, B[a2]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[6]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a3]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[7]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a4]);
           digitalWrite(latchPin, HIGH);
         }
         else {
-          x = giatri * 1000;//0.000-9.999
+          // 24.56 -> 24560
+          // 10.234 -> 10234
+          // 1.234 -> 1234
+          x = giatri;//0.000-9.999
           a1 = x / 1000;
           a2 = x % 1000 / 100;
           a3 = x % 1000 % 100 / 10;
           a4 = x % 1000 % 100 % 10;
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[4]);
           shiftOut(dataPin, clockPin, MSBFIRST, B[a1]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[5]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a2]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[6]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a3]);
           digitalWrite(latchPin, HIGH);
           digitalWrite(latchPin, LOW);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[1]);
-          //shiftOut(dataPin, clockPin, MSBFIRST, D[0]);
           shiftOut(dataPin, clockPin, MSBFIRST, C[7]);
           shiftOut(dataPin, clockPin, MSBFIRST, A[a4]);
           digitalWrite(latchPin, HIGH);
@@ -209,8 +205,9 @@ void setup() {
   digitalWrite(sen_i, LOW);
   analogReference(INTERNAL);//INTERNAL Vref = 1.096
   //adc value (0,550]
-  analog_u.setActivityThreshold(1.0);
-  analog_u.setSnapMultiplier(0.1);
+  analog_u.setActivityThreshold(3.0);
+  analog_u.setSnapMultiplier(0.01);
+  analog_u.setAnalogResolution(4092);
   //adc sen_i
   analog_i.setActivityThreshold(1.0);
   analog_i.setSnapMultiplier(0.01);
@@ -302,67 +299,16 @@ void loop() {
   setDac(encoder0Pos, 0);
 
   // update the ResponsiveAnalogRead object every loop
-  analog_u.update();
+  //analog_u.update();
   analog_i.update();
 
   //update value every encoder haveChnge or 1/4 seconds
-  if ( have_change || (millis() - t_update_display > 250))
+  // 250 for run, 100 for debug
+  if ( have_change || (millis() - t_update_display > 100))
   {
-    /*
-    //=====================================================
-    //debug calib sen_u===================================
-    //
-    int temp1, temp2, temp3;
-    temp1 = analogRead(sen_u);
-
-    //if hasChange, update Threshold
-    if (analog.hasChanged()) {
-      //check range adc to change threshold
-      if (analog.getValue() < 550) threshold_1();
-      else {
-        threshold_2();
-        //update the ResponsiveAnalogRead object
-        analog.update();
-      }
-    }
-
-    temp2 = analog.getValue();
-    temp3 = map_u(temp2);
-
-    Serial.print(temp1);
-    Serial.print("\t");
-    Serial.print(temp2);
-    Serial.print("\t");
-    Serial.println(temp3);
-
-    u = temp3 / MAX_READING_10_bit * Vref;
-    //===================================================*/
-
-    /*
-    //if hasChange on analog snap, update Threshold
-    if (analog_u.hasChanged()) {
-      //check range adc to change threshold
-      if (analog_u.getValue() < 550) {
-        //adc value (0;550)
-        analog_u.setActivityThreshold(2.0);
-        analog_u.setSnapMultiplier(0.025);
-      }
-      else {
-        //adc value (550;1023)
-        analog_u.setActivityThreshold(3.0);
-        analog_u.setSnapMultiplier(0.01);
-      }
-      //update the ResponsiveAnalogRead object
-      analog_u.update();
-    }
-    u = map_u(analog_u.getValue()) / MAX_READING_10_bit * Vref;
-    //i = analog_i.getValue() / MAX_READING_10_bit * Vref;
-
-    Serial.print(analog_i.getValue()); Serial.print("\t");
-    Serial.println(analogRead(sen_i));
-    */
 
     //if hasChange on analog snap, update Threshold
+    /*
     if (analog_u.hasChanged()) {
       //check range adc to change threshold
       if (analog_u.getValue() < 450) {
@@ -378,23 +324,29 @@ void loop() {
       //update the ResponsiveAnalogRead object
       analog_u.update();
     }
-    
+    */
+
+    u_xx = int(adc.analogReadXXbit(sen_u, 12, 5));
+    analog_u.update(u_xx);
+
     u_raw = analog_u.getValue();
     i_raw = analog_i.getValue();
 
     //u = u_raw/MAX_READING_10_bit*Vref*100;
-    // calib = 0.97*x + 0.686
-    // = u_raw/1023*1.096*100*0.97 + 0.686
-    // = u_raw*0.104 + 0.686
-    if(u_raw) u = u_raw*0.104 + 0.686;
+    // 24.56 -> 24560
+    // 1.234 -> 1234
+    if (u_raw) u = (unsigned long)(u_raw * 25.959 + 819.265);
     else u = 0;
-    i = i_raw/MAX_READING_10_bit*Vref*10;
+    i = i_raw / MAX_READING_10_bit * Vref * 10;
 
-    /*
+
+    analogRead(sen_u);
+    Serial.print(analogRead(sen_u)); Serial.print("\t");
+    Serial.print(u_xx); Serial.print("\t");
     Serial.print(u_raw); Serial.print("\t"); Serial.println(u);
-    Serial.print(i_raw); Serial.print("\t"); Serial.print(i);
-    Serial.print("\t"); Serial.println(encoder0Pos);
-    */
+    //Serial.print(i_raw); Serial.print("\t"); Serial.print(i);
+    //Serial.print("\t"); Serial.println(encoder0Pos);
+
 
     //clear have_change encoder
     have_change = 0;

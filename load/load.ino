@@ -16,9 +16,8 @@
 #define Vref 4.97 //EXTERNAL TL431
 
 //max_pwm_i_set value 2^10 - 1 = 1023
-#define max_index_i_set 50
-//#define max_index_i_set 250
-#define min_index_i_set 0
+#define max_i_set_point 5000
+#define min_i_set_point 0
 #define max_pwm_i_set 1023
 #define min_pwm_i_set 0
 
@@ -48,26 +47,15 @@ const int B[10] = {254, 134, 189, 175, 199, 111, 127, 166, 255, 239};// number w
 const int C[8] = {223, 191, 127, 239, 253, 251, 247, 254};// select LED
 const float E[10] = {0, 1.111, 2.222, 3.333, 4.444, 5.555, 6.666, 7.777, 8.888, 9.999};
 //led data==========================================================================
-const float i_set_point[51] = {0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, \
-                               1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, \
-                               2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, \
-                               3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, \
-                               4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.0
-                              };
-const int i_set_dac[51] = { 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, \
-                            22, 24, 26, 28, 30, 32, 34, 36, 38, 40, \
-                            42, 45, 47, 49, 51, 53, 55, 57, 59, 61, \
-                            63, 65, 67, 69, 71, 73, 75, 77, 79, 81, \
-                            83, 85, 87, 90, 92, 94, 96, 98, 100, 102,
-                          };
+
 int cur_value_dac = 0;
 
 unsigned long t_update_display, t_update_i_set, t_buzz, t_downI, t_upI;
-float value_i_load, value_u_s, value_i_s;
-float led_value_u_s, led_value_i_s, led_value_i_load;
+int value_i_load, value_u_s, value_i_s;
+int led_value_u_s, led_value_i_s, led_value_i_load;
 float delta_i_set = 0;
 int raw_i_load, raw_u_s, raw_i_s;
-int index_i_set = 0;
+int i_set_point = 0;
 int pwm_i_set = 0;
 
 unsigned int button = 0;
@@ -121,7 +109,7 @@ void loop() {
           off_i();
           stt_stop = 0;
           //clear i_set_point
-          index_i_set = 0;
+          i_set_point = 0;
           tit();
           break;
         }
@@ -130,7 +118,7 @@ void loop() {
           off_i();
           stt_stop = 0;
           //clear i_set_point
-          index_i_set = 0;
+          i_set_point = 0;
           break;
         }
     }
@@ -146,37 +134,39 @@ void loop() {
   else if (stt_up) { // up button
     switch (stt_up) {
       case 1: {
-          index_i_set = index_i_set + 1;
-          if (index_i_set > max_index_i_set) index_i_set = max_index_i_set;
+          i_set_point = i_set_point + 100;
+          if (i_set_point > max_i_set_point) i_set_point = max_i_set_point;
           break;
         }
       case 2: {
-          index_i_set = index_i_set + 5;
-          if (index_i_set > max_index_i_set) index_i_set = max_index_i_set;
+          i_set_point = i_set_point + 500;
+          if (i_set_point > max_i_set_point) i_set_point = max_i_set_point;
           break;
         }
     }
     stt_up = 0;
+    stt_set_i = false;
   }
   else if (stt_down) { // down button
     switch (stt_down) {
       case 1: {
-          index_i_set = index_i_set - 1;
-          if (index_i_set < min_index_i_set) index_i_set = min_index_i_set;
+          i_set_point = i_set_point - 100;
+          if (i_set_point < min_i_set_point) i_set_point = min_i_set_point;
           break;
         }
       case 2: {
-          index_i_set = index_i_set - 5;
-          if (index_i_set < min_index_i_set) index_i_set = min_index_i_set;
+          i_set_point = i_set_point - 500;
+          if (i_set_point < min_i_set_point) i_set_point = min_i_set_point;
           break;
         }
     }
     stt_down = 0;
+    stt_set_i = false;
   }
 
   sensing(); // get value
   if (stt_run) { // control I
-    set_i(index_i_set);
+    set_i(i_set_point);
   }
 
   if (stt_set_i == false) {
@@ -187,12 +177,21 @@ void loop() {
   }
   else {
     // cyclic update
+    // 500 for run, 100 for debug
     if (millis() - t_update_display > 500) {
       t_update_display = millis();
+      // update led 7-seg
       led_value_i_load = value_i_load;
       led_value_u_s = value_u_s;
       led_value_i_s = value_i_s;
-
+/*
+      // print led value
+      Serial.print(raw_u_s);
+      Serial.print("\t");
+      Serial.print(value_u_s, 4);
+      Serial.print("\t");
+      Serial.println(led_value_u_s, 4);
+*/
       // test raw ADC
       /*
       Serial.print(analogRead(pin_u_s));
@@ -205,22 +204,22 @@ void loop() {
 
       // test raw snap ADC
       /*
-      //Serial.println();
-      Serial.print(raw_u_s);
-      Serial.print("\t");
-      Serial.print(raw_i_load);
-      Serial.print("\t");
-      Serial.println(raw_i_s);
+            //Serial.println();
+            Serial.println(raw_u_s);
+            Serial.print("\t");
+            Serial.print(raw_i_load);
+            Serial.print("\t");
+            Serial.println(raw_i_s);
       */
       // test snap ADC
-      /*
+      
       //Serial.println();
-      Serial.print(value_u_s,3);
+      Serial.print(value_u_s);
       Serial.print("\t");
-      Serial.print(value_i_load,3);
+      Serial.print(value_i_load);
       Serial.print("\t");
-      Serial.println(value_i_s,3);
-      */
+      Serial.println(value_i_s);
+      
     }
   }
 
@@ -230,14 +229,14 @@ void loop() {
 void show() {
   //show i_load i_s=========================================
   int l0, l1, l2, l3, r0, r1, r2, r3, x;
-  x = led_value_i_load * 1000;
+  x = led_value_i_load;
   //x = value_i_load;
   l0 = x / 1000;
   l1 = x % 1000 / 100;
   l2 = x % 1000 % 100 / 10;
   l3 = x % 1000 % 100 % 10;
 
-  x = led_value_i_s * 1000;
+  x = led_value_i_s;
   //x = value_i_s;
   r0 = x / 1000;
   r1 = x % 1000 / 100;
@@ -270,14 +269,13 @@ void show() {
   digitalWrite(latchPin, HIGH);
 
   //show i_set u_s==========================================
-  x = i_set_point[index_i_set] * 1000;
+  x = i_set_point;
   l0 = x / 1000;
   l1 = x % 1000 / 100;
   l2 = x % 1000 % 100 / 10;
   l3 = x % 1000 % 100 % 10;
 
-  x = led_value_u_s * 100;
-  //x = value_u_s;
+  x = led_value_u_s;
   r0 = x / 1000;
   r1 = x % 1000 / 100;
   r2 = x % 1000 % 100 / 10;
@@ -483,7 +481,7 @@ int checkbutton() {
 }
 
 void on_NS() {
-  index_i_set = 0; //reset index_i_set to 0 then turn on N,S
+  i_set_point = 0; //reset i_set_point to 0 then turn on N,S
   Serial.println("onNS");
 
   delay(500);
@@ -493,6 +491,8 @@ void on_NS() {
 
 void off_NS() {
   digitalWrite(led_start, LOW);
+  digitalWrite(pin_onNS, LOW);
+  delay(10);
   digitalWrite(pin_onNS, LOW);
 }
 
@@ -563,7 +563,7 @@ void initADC() {
 
   // snap_u_s
   snap_u_s.setActivityThreshold(1.0);
-  snap_u_s.setSnapMultiplier(0.1);
+  snap_u_s.setSnapMultiplier(0.0075);
 }
 
 void initPWMDAC() {
@@ -588,90 +588,56 @@ void buzz1() {
   }
 }
 
-/*
-void set_i(int index_i_set) {
-  if (index_i_set == 0) pwm_i_set = 0;
 
-  if (debug) Serial.println(value_i_load);
-  if (value_i_load < i_set_point[index_i_set]) {// increase I
-    if (millis() - t_upI > 25) {
-      if (++pwm_i_set > max_pwm_i_set) pwm_i_set = 1023;
-      // 10 bit resolution, period = 7.8Khz
-      fastPWMdac.analogWrite10bit(pwm_i_set);
-      t_upI = millis();
-      if (debug) {
-        Serial.print("\t\t");
-        Serial.print("+ ");
-        Serial.println(pwm_i_set);
-      }
-    }
-  }
+void set_i(int i_set_point) {
+  if (i_set_point == 0) pwm_i_set = 0;
+  delta_i_set = abs(i_set_point - value_i_load);
 
-  if (value_i_load > i_set_point[index_i_set]) {// decrease I
-    if (--pwm_i_set < min_pwm_i_set) pwm_i_set = 0;
-    fastPWMdac.analogWrite10bit(pwm_i_set);
-    if (debug) {
-      Serial.print("\t\t");
-      Serial.print("- ");
-      Serial.println(pwm_i_set);
-    }
-  }
-}
-*/
-
-void set_i(int index_i_set) {
-  if (index_i_set == 0) pwm_i_set = 0;
-  delta_i_set = abs(i_set_point[index_i_set] - value_i_load);
-
-  if (delta_i_set > 0.01) {
-    if (value_i_load < i_set_point[index_i_set]) {// increase I
+  if (delta_i_set > 5) {
+    if (value_i_load < i_set_point) {// increase I
       if (millis() - t_upI > 50) {
         if (++pwm_i_set > max_pwm_i_set) pwm_i_set = 1023;
         // 10 bit resolution, period = 7.8Khz
         fastPWMdac.analogWrite10bit(pwm_i_set);
         t_upI = millis();
         if (debug) {
-          Serial.print(delta_i_set, 5);
+          Serial.print(delta_i_set);
           Serial.println("\t+");
         }
       }
     }
 
-    if (value_i_load > i_set_point[index_i_set]) {// decrease I
+    if (value_i_load > i_set_point) {// decrease I
       if (millis() - t_downI > 50) {
         if (--pwm_i_set < min_pwm_i_set) pwm_i_set = 0;
         fastPWMdac.analogWrite10bit(pwm_i_set);
         if (debug) {
-          Serial.print(delta_i_set, 5);
+          Serial.print(delta_i_set);
           Serial.println("\t-");
         }
       }
     }
-    stt_set_i = false;
+    //stt_set_i = false;
   }
   else stt_set_i = true;
 }
 
 void sensing() {
-  //raw_u_s = analogRead(pin_u_s);
-  //raw_i_s = analogRead(pin_i_s);
-  //raw_i_load = analogRead(pin_i_load);
-
-
+  analogRead(pin_u_s);
   raw_u_s = snap_u_s.getValue();
   raw_i_s = snap_i_s.getValue();
   raw_i_load = snap_i_load.getValue();
 
   //voltage: raw/1023.0*Vref*19
-  if (raw_u_s) value_u_s = raw_u_s / 10.5;
+  if (raw_u_s) value_u_s = raw_u_s * 9.275 + 69.75;
   else value_u_s = 0;
 
   // i_s
-  if (raw_i_s) value_i_s = raw_i_s * 0.0053 - 0.0052;
+  if (raw_i_s) value_i_s = raw_i_s * 5.3 - 5.2;
   else value_i_s = 0;
 
   // i_load
-  if (raw_i_load) value_i_load = raw_i_load * 0.0053 + 0.01;
+  if (raw_i_load) value_i_load = raw_i_load * 5.3 + 10.0;
   else value_i_load = 0;
 }
 

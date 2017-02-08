@@ -1,10 +1,10 @@
-#include "eRCaGuy_analogReadXXbit.h"
+#include "./eRCaGuy_analogReadXXbit.h"
 
 #include <SPI.h>
 #include <EEPROM.h>
 // adc eliminating noise
 // include the ResponsiveAnalogRead library
-#include "ResponsiveAnalogRead.h"
+#include "./ResponsiveAnalogRead.h"
 
 #define a_1 50
 #define max_encoder 4095

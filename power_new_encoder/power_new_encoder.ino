@@ -112,8 +112,8 @@ void setup() {
   digitalWrite(sen_i, LOW);
   analogReference(INTERNAL);//INTERNAL Vref = 1.096
   //adc value (0,550]
-  analog_u.setActivityThreshold(3.0);
-  analog_u.setSnapMultiplier(0.05);
+  analog_u.setActivityThreshold(1.0);
+  analog_u.setSnapMultiplier(0.001);
   analog_u.setAnalogResolution(4092);
   //adc sen_i
   analog_i.setActivityThreshold(1.0);
@@ -216,14 +216,15 @@ void checkencoder() {
 void loop() {
 
   // update the ResponsiveAnalogRead object every loop
-  //analog_u.update();
+  analog_u.update();
   analog_i.update();
+  /*
+    u_xx = int(adc.analogReadXXbit(sen_u, 12, 2));
+    analog_u.update(u_xx);
 
-  u_xx = int(adc.analogReadXXbit(sen_u, 12, 2));
-  analog_u.update(u_xx);
-
-  u_raw = analog_u.getValue();
-  i_raw = analog_i.getValue();
+    u_raw = analog_u.getValue();
+    i_raw = analog_i.getValue();
+  */
 
   //u = u_raw/MAX_READING_10_bit*Vref*100;
   // 24.56 -> 24560
@@ -234,56 +235,41 @@ void loop() {
 
   // update value every encoder haveChnge or 1/4 seconds
   // 250 for run, 100 for debug
-  if ( have_change || (millis() - t_update_display > 500))
+  if ( have_change || (millis() - t_update_display > 100))
   {
+    u_xx = int(adc.analogReadXXbit(sen_u, 12, 1));
+    analog_u.update(u_xx);
 
-    //if hasChange on analog snap, update Threshold
-    /*
-    if (analog_u.hasChanged()) {
-      //check range adc to change threshold
-      if (analog_u.getValue() < 450) {
-        //adc value (0;450)
-        analog_u.setActivityThreshold(1.0);
-        analog_u.setSnapMultiplier(0.1);
-      }
-      else {
-        //adc value (450;1023)
-        analog_u.setActivityThreshold(3.0);
-        analog_u.setSnapMultiplier(0.05);
-      }
-      //update the ResponsiveAnalogRead object
-      analog_u.update();
-    }
-    */
-    /*
-        u_xx = int(adc.analogReadXXbit(sen_u, 12, 1));
-        analog_u.update(u_xx);
+    u_raw = analog_u.getValue();
+    i_raw = analog_i.getValue();
 
-        u_raw = analog_u.getValue();
-        i_raw = analog_i.getValue();
+    //u = u_raw/MAX_READING_10_bit*Vref*100;
+    // 24.56 -> 24560
+    // 1.234 -> 1234
+    if (u_raw) u = (unsigned long)(u_raw * 25.959 + 819.265);
+    else u = 0;
+    i = i_raw / MAX_READING_10_bit * Vref * 10;
 
-        //u = u_raw/MAX_READING_10_bit*Vref*100;
-        // 24.56 -> 24560
-        // 1.234 -> 1234
-        if (u_raw) u = (unsigned long)(u_raw * 25.959 + 819.265);
-        else u = 0;
-        i = i_raw / MAX_READING_10_bit * Vref * 10;
-    */
 
-    /*
-        analogRead(sen_u);
-        //Serial.print(analogRead(sen_u)); Serial.print("\t");
-        Serial.print(encoder0Pos); Serial.print("\t");
-        Serial.print(u_xx); Serial.print("\t");
-        Serial.print(u_raw); Serial.print("\t"); Serial.println(u);
-        //Serial.print(i_raw); Serial.print("\t"); Serial.print(i);
-        //Serial.print("\t"); Serial.println(encoder0Pos);
-    */
 
-    Serial.print(u_xx); Serial.print("\t");
+    //analogRead(sen_u);
+    //u_xx = int(adc.analogReadXXbit(sen_u, 12, 3));
+
+    //u = (unsigned long)(u_xx * 25.959 + 819.265);
+
     Serial.print(u_raw); Serial.print("\t");
-    Serial.println(encoder0Pos);
+    Serial.println(analogRead(sen_u));
+    //Serial.print(encoder0Pos); Serial.print("\t");
+    //Serial.print(u_xx); Serial.print("\t");
+    //Serial.print(u_raw); Serial.print("\t"); Serial.println(u);
+    //Serial.print(i_raw); Serial.print("\t"); Serial.print(i);
+    //Serial.print("\t"); Serial.println(encoder0Pos);
 
+    /*
+        Serial.print(u_xx); Serial.print("\t");
+        Serial.print(u_raw); Serial.print("\t");
+        Serial.println("xx");
+    */
     i_led = i;
     u_led = u;
     //clear have_change encoder
@@ -293,7 +279,9 @@ void loop() {
 
   //Serial.print(test);Serial.print("\t"); Serial.println(u);
   // test set u
-  set_u(encoder0Pos);
+  //set_u(encoder0Pos);
+
+  setDac(2000);
 
   hienthi(i_led, 1);
   hienthi(u_led, 2);

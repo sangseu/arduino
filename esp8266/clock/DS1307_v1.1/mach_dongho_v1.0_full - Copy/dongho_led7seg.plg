@@ -1,0 +1,35 @@
+<html>
+<body>
+<pre>
+<h1>µVision Build Log</h1>
+<h2>Project:</h2>
+D:\mach_dongho_v1.0_full - Copy\dongho_led7seg.uvproj
+Project File Date:  06/19/2015
+
+<h2>Output:</h2>
+Build target 'Target 1'
+compiling RTC_DS1307.c...
+RTC_DS1307.C(133): warning C280: 'tm': unreferenced local variable
+linking...
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?_DELAY_US?RTC_DS1307
+*** WARNING L16: UNCALLED SEGMENT, IGNORED FOR OVERLAY PROCESS
+    SEGMENT: ?PR?DS1307_GETDATE?RTC_DS1307
+*** WARNING L1: UNRESOLVED EXTERNAL SYMBOL
+    SYMBOL:  BIP_BUZER
+    MODULE:  RTC_DS1307.obj (RTC_DS1307)
+*** WARNING L2: REFERENCE MADE TO UNRESOLVED EXTERNAL
+    SYMBOL:  BIP_BUZER
+    MODULE:  RTC_DS1307.obj (RTC_DS1307)
+    ADDRESS: 01D5H
+*** WARNING L2: REFERENCE MADE TO UNRESOLVED EXTERNAL
+    SYMBOL:  BIP_BUZER
+    MODULE:  RTC_DS1307.obj (RTC_DS1307)
+    ADDRESS: 00F8H
+*** WARNING L2: REFERENCE MADE TO UNRESOLVED EXTERNAL
+    SYMBOL:  BIP_BUZER
+    MODULE:  RTC_DS1307.obj (RTC_DS1307)
+    ADDRESS: 03C8H
+Program Size: data=31.1 xdata=0 code=1563
+creating hex file from "dongho_led7seg"...
+"dongho_led7seg" - 0 Error(s), 7 Warning(s).

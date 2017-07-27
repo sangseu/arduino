@@ -1,0 +1,385 @@
+C51 COMPILER V9.01   RTC_DS1307                                                            06/19/2015 09:02:21 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE RTC_DS1307
+OBJECT MODULE PLACED IN RTC_DS1307.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE RTC_DS1307.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          /**********************************************************************
+   2          * Signal university- Telecom engineer department
+   3          * 
+   4          * Code for ds1307_led7seg CLOCK 
+   5          *
+   6          * Brief :  Source File for 89s52
+   7          * Version       : 1.1
+   8          * Date  :       19. Jul. 2015
+   9          * Author        : Do Ngoc Tuan
+  10          * Phone         : 0986588017
+  11          * This code describes for DS1307 CLOCK 
+  12          ***********************************************************************
+  13          **********************************************************************/
+  14          #include <p89v51rx2.h>
+  15          #define SCL    P2_0                        // noi chan DS1307 voi 89s52 
+  16          #define SDA    P2_1
+  17          
+  18          sbit menu = P1^1;                               // cac nut dieu chinh h
+  19          sbit ok = P1^0;
+  20          sbit up = P1^3;
+  21          sbit down = P1^2;
+  22          
+  23          
+  24                           
+  25          //==================================Ham convert=======================================================
+  26          unsigned int BCD2Dec(unsigned int BCD){
+  27   1              unsigned int L, H;
+  28   1              L=BCD & 0x0F;
+  29   1              H=(BCD>>4)*10;
+  30   1              return (H+L);
+  31   1      }
+  32          unsigned int Dec2BCD(unsigned int Dec){
+  33   1              unsigned int L, H;
+  34   1              L=Dec % 10;
+  35   1              H=(Dec/10)<<4;
+  36   1              return (H+L);
+  37   1      }
+  38          //=====================================du lieu lef7seg====================================================
+             -=
+  39          unsigned char led[10]={0x40,0xf9,0xa4,0xb0,0x99,0x92,0x82,0xf8,0x80,0x90}; 
+  40          unsigned char sec,min,hour,day,month,year,s,m,h,i;
+  41          
+  42           void delay(unsigned int time)   // moi so tuong ung 1000us .
+  43          {                                                                                                                  
+  44   1              while (--time)                           
+  45   1              {
+  46   2                      unsigned char temp;
+  47   2                      temp = 80;
+  48   2                      while(--temp);
+  49   2              }
+  50   1      }
+  51          
+  52           void delay_ms(unsigned int t){
+  53   1              unsigned int i,j;
+  54   1              for(i=0;i<t;i++)
+C51 COMPILER V9.01   RTC_DS1307                                                            06/19/2015 09:02:21 PAGE 2   
+
+  55   1              for(j=0;j<125;j++);
+  56   1      }
+  57          
+  58          void delay_us(unsigned int t){
+  59   1              unsigned int i;
+  60   1              for(i=0;i<t;i++);
+  61   1      }
+  62          /****************Cac ham giao tiep I2C***************************/
+  63          void I2C_time_start(){
+  64   1                SCL = 1; 
+  65   1                SDA = 1;
+  66   1                SDA = 0; 
+  67   1                SCL = 0; 
+  68   1      }
+  69          void I2C_time_stop(){
+  70   1                SCL = 1; 
+  71   1                SDA = 0; 
+  72   1                SDA=1;
+  73   1                SCL=1; 
+  74   1      }
+  75          unsigned char I2C_write(unsigned char dat){
+  76   1                unsigned char i;
+  77   1                for (i=0;i<8;i++){
+  78   2                          SDA = (dat & 0x80); 
+  79   2                          SCL=1;
+  80   2                          SCL=0;
+  81   2                          dat<<=1;
+  82   2                }
+  83   1                SCL = 1; 
+  84   1                SCL = 0;
+  85   1                return dat;
+  86   1      }
+  87          unsigned char I2C_read(void){
+  88   1                bit rd_bit;
+  89   1                unsigned char i, dat;
+  90   1                dat = 0x00;
+  91   1                for(i=0;i<8;i++)
+  92   1                        {                        /* For loop read data 1 byte */
+  93   2                          SCL = 1;
+  94   2                          rd_bit = SDA; /* Keep for check acknowledge */
+  95   2                          dat = dat<<1;
+  96   2                          dat = dat | rd_bit; /* Keep bit data in dat */
+  97   2                          SCL = 0; /* Clear SCL */
+  98   2                }
+  99   1                return dat;
+ 100   1      }       
+ 101          //==============================Khai bao cho DS1307================================================
+ 102           
+ 103                     /***************Dia chi giao tiep DS1307*********************/
+ 104          #define DS1307_SEC      0x00 //Giay
+ 105          #define DS1307_MIN      0x01 //Phut
+ 106          #define DS1307_HOUR     0x02 //Gio
+ 107          #define DS1307_DAY      0x03 //Thu
+ 108          #define DS1307_DATE     0x04 //Ngay
+ 109          #define DS1307_MONTH    0x05 //Thang
+ 110          #define DS1307_YEAR     0x06 //Nam
+ 111          //====================
+ 112          void edit_m();
+ 113          void edit_h();
+ 114          void display_time();
+ 115          void scan_buzzer();
+ 116          void on_buzzer();
+C51 COMPILER V9.01   RTC_DS1307                                                            06/19/2015 09:02:21 PAGE 3   
+
+ 117          void off_buzzer();
+ 118          void bip_buzer();
+ 119          
+ 120          //===========================
+ 121          
+ 122          void DS1307_Write(unsigned char addr,unsigned char dat){
+ 123   1                unsigned int temp;
+ 124   1                temp = dat ; /*HEX to BCD*/
+ 125   1                
+ 126   1                I2C_time_start(); /* time_start i2c bus */
+ 127   1                I2C_write(0XD0); /* Connect to DS1307 */
+ 128   1                I2C_write(addr); /* Requetime_5 RAM address on DS1307 */
+ 129   1                I2C_write(temp); 
+ 130   1                I2C_time_stop();
+ 131   1      }
+ 132          unsigned char DS1307_Read(unsigned char addr){
+ 133   1                unsigned int tm,ret;
+ 134   1                I2C_time_start(); /* time_start i2c bus */
+ 135   1                I2C_write(0xD0); /* Connect to DS1307 */
+ 136   1                I2C_write(addr); /* Requetime_5 RAM address on DS1307 */
+ 137   1                I2C_time_start(); /* time_start i2c bus */
+ 138   1                I2C_write(0XD1); /* Connect to DS1307 for Read */
+ 139   1                ret = I2C_read(); /* Receive data */
+ 140   1                I2C_time_stop();
+ 141   1                return ret;
+ 142   1      }
+*** WARNING C280 IN LINE 133 OF RTC_DS1307.C: 'tm': unreferenced local variable
+ 143          void DS1307_Set(){
+ 144   1                DS1307_Write(DS1307_SEC,sec);
+ 145   1                DS1307_Write(DS1307_MIN,min); 
+ 146   1                DS1307_Write(DS1307_HOUR,hour); 
+ 147   1                DS1307_Write(DS1307_DATE,day); 
+ 148   1                DS1307_Write(DS1307_MONTH,month); 
+ 149   1                DS1307_Write(DS1307_YEAR,year); 
+ 150   1      }
+ 151          void DS1307_GetTime(){
+ 152   1               
+ 153   1                hour=DS1307_Read(DS1307_HOUR);
+ 154   1                min=DS1307_Read(DS1307_MIN);
+ 155   1                sec=DS1307_Read(DS1307_SEC);
+ 156   1      }
+ 157          void DS1307_GetDate(){
+ 158   1               
+ 159   1                day=DS1307_Read(DS1307_DATE);
+ 160   1                month=DS1307_Read(DS1307_MONTH);
+ 161   1                year=DS1307_Read(DS1307_YEAR);
+ 162   1      }
+ 163          //===================================ham edit h, m, display^^========================================
+ 164          void edit_m()
+ 165          {
+ 166   1      bip_buzer();
+ 167   1      while(ok)
+ 168   1      {
+ 169   2                           if((up==0) )
+ 170   2                       {    
+ 171   3                                m++;
+ 172   3                                if(m>59)m=0;
+ 173   3                                while(!up)
+ 174   3                                {
+ 175   4                                 if(m>59)m=0;
+ 176   4                                P0=led[m%10]; P2_3=0;delay(20);P2_3=1;
+ 177   4                            P0=led[m/10]; P2_2=0;delay(20);P2_2=1;
+C51 COMPILER V9.01   RTC_DS1307                                                            06/19/2015 09:02:21 PAGE 4   
+
+ 178   4                            }
+ 179   3                   }   
+ 180   2                        /***************************/
+ 181   2                               if((down==0) )
+ 182   2                       { 
+ 183   3                                if(m==0)m=59;
+ 184   3                                m--;
+ 185   3                                while(!down)
+ 186   3                                  {
+ 187   4                                if(m==0)m=59;
+ 188   4                                P0=led[m%10]; P2_3=0;delay(20);P2_3=1;
+ 189   4                            P0=led[m/10]; P2_2=0;delay(20);P2_2=1;
+ 190   4                              }
+ 191   3              }
+ 192   2              P0=led[m%10]; P2_3=0;delay(20);P2_3=1;
+ 193   2          P0=led[m/10]; P2_2=0;delay(20);P2_2=1;
+ 194   2               if(menu==0)    //chon sang edit_h
+ 195   2              {while(!menu);
+ 196   3              edit_h();}      
+ 197   2      }
+ 198   1      min=Dec2BCD(m);
+ 199   1      DS1307_Write(DS1307_MIN,min);
+ 200   1      delay(20);              
+ 201   1      }       
+ 202          
+ 203          //====================================================                                  
+ 204          void edit_h()
+ 205          {
+ 206   1      bip_buzer();
+ 207   1      while(ok)
+ 208   1      {
+ 209   2                           if(up==0) 
+ 210   2                       {    
+ 211   3                                h++;
+ 212   3                                if(h>23)m=0;
+ 213   3                                while(!up)
+ 214   3                                {
+ 215   4                                 if(h>23)h=0;
+ 216   4                                P0=led[h%10]; P2_6=0;delay(20);P2_6=1;
+ 217   4                            P0=led[h/10]; P2_7=0;delay(20);P2_7=1;
+ 218   4                            }
+ 219   3                   }   
+ 220   2                        /***************************/
+ 221   2                               if(down==0) 
+ 222   2                       { 
+ 223   3                            if(h==0)h=23;
+ 224   3                                h--;
+ 225   3                                while(!down)
+ 226   3                                  {
+ 227   4                                if(h==0)h=23;
+ 228   4                                P0=led[h%10]; P2_6=0;delay(20);P2_6=1;
+ 229   4                            P0=led[h/10]; P2_7=0;delay(20);P2_7=1;
+ 230   4                              }
+ 231   3              }
+ 232   2              P0=led[h%10]; P2_6=0;delay(20);P2_6=1;
+ 233   2          P0=led[h/10]; P2_7=0;delay(20);P2_7=1;
+ 234   2              if(menu==0)     //chon sang display_time
+ 235   2              {while(!menu);
+ 236   3              edit_m();}      
+ 237   2      }
+ 238   1      hour=Dec2BCD(h);
+ 239   1      DS1307_Write(DS1307_HOUR,hour);
+C51 COMPILER V9.01   RTC_DS1307                                                            06/19/2015 09:02:21 PAGE 5   
+
+ 240   1      delay(20);                      
+ 241   1      }       
+ 242                           
+ 243          //=================================display_led7seg==================================================
+ 244          void display_time()
+ 245          { DS1307_GetTime();
+ 246   1                       
+ 247   1                        m=BCD2Dec(min);
+ 248   1                        h=BCD2Dec(hour);
+ 249   1      
+ 250   1                        P3_0=1;
+ 251   1                        if(BCD2Dec(sec)!=s){P3_0=0;}
+ 252   1                          s=BCD2Dec(sec);
+ 253   1                        P0=led[m%10]; P2_3=0;delay(4);P2_3=1;
+ 254   1                        P0=led[m/10]; P2_2=0;delay(4);P2_2=1;
+ 255   1                        P0=led[h%10]; P2_6=0;delay(4);P2_6=1;
+ 256   1                        P0=led[h/10]; P2_7=0;delay(4);P2_7=1;
+ 257   1                        P0=led[m%10]; P2_3=0;delay(4);P2_3=1;
+ 258   1                        P0=led[m/10]; P2_2=0;delay(4);P2_2=1;
+ 259   1                        P0=led[h%10]; P2_6=0;delay(4);P2_6=1;
+ 260   1                        P0=led[h/10]; P2_7=0;delay(4);P2_7=1;
+ 261   1                         scan_buzzer();
+ 262   1                      
+ 263   1                                             
+ 264   1      }
+ 265          //==========================================buzzer===============================================
+ 266          void scan_buzzer()                      // day la cho chung ta hen h tat mo thiet bi, tuy nhien can luu no vao rom ds1307
+ 267          { 
+ 268   1                      if((h==21)&(m==16)&(s==0)) P3_1=0;
+ 269   1                      if((h==21)&(m==20)&(s==0)) P3_1=1; 
+ 270   1      
+ 271   1                      if((h==1)&(m==20)&(s==0)) P3_7=0;
+ 272   1                      if((h==1)&(m==23)&(s==0)) P3_7=1; 
+ 273   1      
+ 274   1              
+ 275   1      
+ 276   1      }
+ 277          
+ 278          
+ 279                          
+ 280          //================================================^^=================================================
+ 281          
+ 282          void main()
+ 283          {           
+ 284   1                       keny: ;
+ 285   1                       
+ 286   1                       P2_7=0;
+ 287   1                       P2_6=0;
+ 288   1                       delay_ms(300);
+ 289   1                       P2_2=0;
+ 290   1                       delay_ms(300);
+ 291   1                       P2_3=0;
+ 292   1                       delay_ms(300);
+ 293   1                       bip_buzer();
+ 294   1                       P2=0xff;
+ 295   1      
+ 296   1                   hour=DS1307_Read(DS1307_HOUR);
+ 297   1               min=DS1307_Read(DS1307_MIN);
+ 298   1                       DS1307_Set();
+ 299   1      
+ 300   1      
+ 301   1               while (1)      
+C51 COMPILER V9.01   RTC_DS1307                                                            06/19/2015 09:02:21 PAGE 6   
+
+ 302   1         {  
+ 303   2                       DS1307_GetTime();
+ 304   2                       display_time();
+ 305   2                       scan_buzzer();
+ 306   2                
+ 307   2                                          
+ 308   2               if(!menu&&!up)           //scan edit
+ 309   2                       { 
+ 310   3                          while(!menu);
+ 311   3                              edit_m();
+ 312   3                       }    
+ 313   2                       
+ 314   2                       if(up==0) 
+ 315   2                       {    
+ 316   3                                while(!up);
+ 317   3                                P2=0xff;
+ 318   3                                P0=0xff;
+ 319   3                                P3_0=1;
+ 320   3                                goto keny     ;
+ 321   3                   }   
+ 322   2                        
+ 323   2                        if(down==0) 
+ 324   2                       {    
+ 325   3                                while(!down);
+ 326   3                                P2=0xff;
+ 327   3                                P0=0xff;
+ 328   3                                P1_1=1;
+ 329   3                                goto keny     ;
+ 330   3                   }   
+ 331   2                        
+ 332   2                        if(ok==0) 
+ 333   2                       {    
+ 334   3                                while(!ok);
+ 335   3                                P2=0xff;
+ 336   3                                P0=0xff;
+ 337   3                                P1_1=1;
+ 338   3                                goto keny     ;
+ 339   3                   }   
+ 340   2                        
+ 341   2                                
+ 342   2            }
+ 343   1      
+ 344   1      
+ 345   1      
+ 346   1      
+ 347   1      }
+ 348                           
+ 349          
+ 350                           
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1304    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     20       3
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       1
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

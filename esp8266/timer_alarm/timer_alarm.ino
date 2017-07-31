@@ -27,7 +27,7 @@ ESP8266WebServer webserver(80);
 const char WIFI_SSID[] = "pega-sp";
 const char WIFI_PSK[] = "pega@6789";
 
-const char *ssid = "pega.timer";
+const char *ssid = "pega-timer";
 const char *password = "pega@6789";
 
 const unsigned int defaultGio = 0;
@@ -36,7 +36,7 @@ const unsigned int maxAlarm = 15;
 const unsigned int EEPROMnumberAlarmsAddr = 1;
 const unsigned int EEPROMstartAlarmInfoAddr = 2;
 const unsigned int tryConnect = 60;
-const unsigned int tryUpdate = 10;
+const unsigned int tryUpdate = 15;
 
 static unsigned int numberAlarms = 0;
 static unsigned int alarmInfo[4 * maxAlarm + 1];
@@ -49,20 +49,20 @@ static AlarmId ids[maxAlarm + 1];
 
 void setup() {
   Serial.begin(115200);
-  delay(500);
+  Alarm.delay(500);
   Serial.println("\nESP8266 ALARM");
 
   initGPIO();
 
   ESP.eraseConfig();
-  delay(500);
+  Alarm.delay(500);
   /*Connect to WiFi*/
   connectWiFi();
   startServer();
 
 
   EEPROM.begin(512);
-  delay(10);
+  Alarm.delay(10);
 
   upDateTime();
 
@@ -138,7 +138,7 @@ void buzz2() {
 
   tit();
   digitalWrite(pin_relay, HIGH);
-  delay(2000); /*2 giay*/
+  Alarm.delay(2000); /*2 giay*/
   digitalWrite(pin_relay, LOW);
 
   Serial.println("end buzz");
@@ -149,7 +149,7 @@ void buzz5() {
 
   tit();
   digitalWrite(pin_relay, HIGH);
-  delay(5000); /*5 giay*/
+  Alarm.delay(5000); /*5 giay*/
   digitalWrite(pin_relay, LOW);
 
   Serial.println("end buzz");
@@ -159,26 +159,39 @@ void buzz10() {
 
   tit();
   digitalWrite(pin_relay, HIGH);
-  delay(10000); /*10 giay*/
+  Alarm.delay(10000); /*10 giay*/
   digitalWrite(pin_relay, LOW);
 
   Serial.println("end buzz");
 }
 
 void tit() {
+  led();
   tone(pin_buzz, 2637.02);
-  delay(100);
+  Alarm.delay(100);
+  led();
   noTone(pin_buzz);
-  delay(50);
+  Alarm.delay(50);
 }
 
 void upDateTime() {
   // update GMT time
-  while (!capnhat.sync("sangseu.github.io", "/gmt/index.html", 80)) {
+  int count = tryUpdate;
+  while (!capnhat.sync("sangseu.github.io", "/gmt/index.html", 80) && count > 0) {
     led();
+    count --;
   }
-  setTime(capnhat.gio(), capnhat.phut(), capnhat.giay(), 1, 1, 11); // delault day-mont-year
-  tit();
+  if (capnhat.synced) {
+    setTime(capnhat.gio(), capnhat.phut(), capnhat.giay(), 1, 1, 11); // delault day-month-year
+    tit();
+  }
+  else {
+    Serial.println("\nFAIL Sync Time");
+    buzzError();
+    // I couldn't found another solution, so reset :((
+    reset();
+  }
+
 }
 
 void resetESP() {
@@ -189,7 +202,7 @@ void resetESP() {
     WiFi.begin(WIFI_SSID, WIFI_PSK);
     count--;
     Serial.print("Try: "); Serial.println(count);
-    delay(5000);
+    Alarm.delay(5000);
   }
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("Connect OK");
@@ -203,9 +216,8 @@ void resetESP() {
     }
     if (capnhat.sync("sangseu.github.io", "/gmt/index.html", 80)) {
       Serial.println("Update OK");
-      // if can connect WiFi, can update Time -> RESET ESP
-      digitalWrite(pin_reset, LOW);
-      delay(50);
+      // if esp8266 can connect WiFi and update Time -> RESET ESP
+      reset();
     }
     else Serial.println("Update FAIL, continue running");
   }
@@ -336,7 +348,7 @@ void handleConfig() {
     EEPROM.write(EEPROMstartAlarmInfoAddr + i, webserver.arg ( i ).toInt());
   }
   EEPROM.commit();
-  delay(100);
+  Alarm.delay(100);
 
   /* free all alarm memory and reload alarm from EEPROM */
   loadAlarms();
@@ -418,19 +430,29 @@ void connectWiFi() {
   WiFi.begin(WIFI_SSID, WIFI_PSK);
 
   // Wait for WiFi connection
-  while ( WiFi.status() != WL_CONNECTED ) {
+  int count = tryConnect;
+  while ( WiFi.status() != WL_CONNECTED && count > 0) {
     WiFi.begin(WIFI_SSID, WIFI_PSK);
-    delay(5000);
+    Alarm.delay(5000);
+    count--;
+    led();
     Serial.print(".");
   }
-  tit();
-  Serial.println("\nConnected");
+  if (WiFi.status() == WL_CONNECTED) {
+    tit();
+    Serial.println("\nConnected");
+  }
+  else {
+    Serial.println("\nFAIL to Connect");
+    buzzError();
+    reset();
+  }
 }
 
 void startServer() {
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
   WiFi.softAP(ssid, password);
-  delay(500);
+  Alarm.delay(500);
   Serial.print("AP IP address: ");
   Serial.println(WiFi.softAPIP());
 
@@ -445,5 +467,19 @@ void startServer() {
 
 void led() {
   digitalWrite(pin_led, !digitalRead(pin_led));
+}
+
+void reset() {
+  digitalWrite(pin_reset, LOW);
+  Alarm.delay(50);
+}
+
+void buzzError() {
+  // :)
+  tit();
+  tit();
+  tit();
+  tit();
+  tit();
 }
 

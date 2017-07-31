@@ -4,6 +4,7 @@ class gmt
 {
   public:
   bool sync(char[], char[], uint16_t);
+  bool synced = false;
   int gio();
   int phut();
   int giay();

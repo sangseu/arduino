@@ -14,6 +14,7 @@ bool gmt::sync(char host[], char url[], uint16_t port)
   // Attempt to make a connection to the remote server
   if ( !client.connect(host, port) ) {
     Serial.println("connection failed");
+    synced = false;
     _return = false;
   }
 
@@ -44,8 +45,14 @@ bool gmt::sync(char host[], char url[], uint16_t port)
   _phut = gmt_string.substring(3, 5);
   _giay = gmt_string.substring(6, 8);
 
-  if (_gio.toInt() || _phut.toInt() || _giay.toInt()) _return = true;
-  else _return = false;
+  if (_gio.toInt() || _phut.toInt() || _giay.toInt()){
+    synced = true;
+    _return = true;
+  }
+  else {
+    synced = false;
+    _return = false;
+  }
   return _return;
 }
 
